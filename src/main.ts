@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { swaggerConfig, swaggerUIOptions } from './config/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -24,14 +26,20 @@ async function bootstrap() {
 
   // CORS configuration
   app.enableCors({
-    origin: configService.get('app.corsOrigin'),
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    origin: configService.get('app.corsOrigin') === '*' ? true : configService.get('app.corsOrigin'),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-device-info'],
     credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // Global prefix for all routes
   app.setGlobalPrefix(configService.get('app.globalPrefix') || 'api');
+
+  // Swagger configuration
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document, swaggerUIOptions);
 
   const port = configService.get('app.port') || 3000;
   const globalPrefix = configService.get('app.globalPrefix') || 'api';
@@ -40,6 +48,9 @@ async function bootstrap() {
 
   logger.log(
     `Application is running on: http://localhost:${port}/${globalPrefix}`,
+  );
+  logger.log(
+    `Swagger documentation: http://localhost:${port}/${globalPrefix}/docs`,
   );
   logger.log(
     `Health check available at: http://localhost:${port}/${globalPrefix}/health`,

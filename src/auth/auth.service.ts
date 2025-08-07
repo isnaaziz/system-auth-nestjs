@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -28,6 +29,8 @@ export interface AuthResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly userRepository: UserRepository,
     private readonly sessionRepository: UserSessionRepository,
@@ -36,24 +39,36 @@ export class AuthService {
     private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
     @Inject(sessionConfig.KEY)
     private readonly sessionConfiguration: ConfigType<typeof sessionConfig>,
-  ) {}
+  ) { }
 
   async validateUser(username: string, password: string): Promise<User | null> {
+    this.logger.debug(`Validating user: ${username}`);
+
     const user = await this.userRepository.findByUsernameOrEmail(username);
 
-    if (!user || user.status !== UserStatus.ACTIVE) {
+    if (!user) {
+      this.logger.warn(`User not found: ${username}`);
+      return null;
+    }
+
+    if (user.status !== 'active') { // Use string instead of enum
+      this.logger.warn(`User not active: ${username}, status: ${user.status}`);
       return null;
     }
 
     const isPasswordValid = await user.validatePassword(password);
     if (!isPasswordValid) {
+      this.logger.warn(`Invalid password for user: ${username}`);
       return null;
     }
 
+    this.logger.debug(`User validation successful: ${username}`);
     return user;
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
+    this.logger.debug(`Registering user: ${registerDto.username}`);
+
     // Check if user already exists
     const userExists = await this.userRepository.existsByUsernameOrEmail(
       registerDto.username,
@@ -66,6 +81,7 @@ export class AuthService {
 
     // Create new user
     const user = await this.userRepository.create(registerDto);
+    this.logger.debug(`User created: ${user.username}`);
 
     // Generate tokens and create session
     return this.generateTokensAndSession(user);
@@ -77,14 +93,28 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<AuthResponse> {
+    this.logger.debug(`Login attempt for: ${loginDto.username}`);
+
     const user = await this.validateUser(loginDto.username, loginDto.password);
 
     if (!user) {
+      this.logger.warn(`Login failed for: ${loginDto.username}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if user already has active session
+    const hasActiveSession = await this.sessionRepository.hasActiveSession(user.id);
+    if (hasActiveSession) {
+      this.logger.warn(`User ${user.username} already has active session`);
+      throw new UnauthorizedException('User already logged in. Please logout first.');
+    }
+
+    // Clean up any expired sessions before creating new one
+    await this.sessionRepository.cleanupExpiredSessions();
+
     // Update last login
     await this.userRepository.update(user.id, { last_login_at: new Date() });
+    this.logger.debug(`Login successful for: ${user.username}`);
 
     // Generate tokens and create session
     return this.generateTokensAndSession(
@@ -119,7 +149,7 @@ export class AuthService {
 
     if (session) {
       await this.sessionRepository.update(session.id, {
-        status: SessionStatus.REVOKED,
+        is_deleted: true,
       });
     }
   }
@@ -159,6 +189,8 @@ export class AuthService {
       role: user.role,
     };
 
+    this.logger.debug(`Generating tokens for user: ${user.username}`);
+
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.jwtConfiguration.accessTokenExpiresIn,
     });
@@ -168,36 +200,35 @@ export class AuthService {
       this.jwtConfiguration.accessTokenExpiresIn,
     );
 
-    // Check session limit
+    // Clean up expired sessions before creating session
+    await this.sessionRepository.cleanupExpiredSessions();
+
+    // For single login, revoke any existing active sessions
     const activeSessionsCount =
       await this.sessionRepository.countActiveSessionsByUserId(user.id);
 
-    if (activeSessionsCount >= this.sessionConfiguration.maxActiveSessions) {
-      // Revoke oldest session
-      const oldestSessions =
-        await this.sessionRepository.findActiveSessionsByUserId(user.id);
-      if (oldestSessions.length > 0) {
-        await this.sessionRepository.revokeSession(
-          oldestSessions[oldestSessions.length - 1].id,
-        );
-      }
+    if (activeSessionsCount > 0) {
+      await this.sessionRepository.revokeAllUserSessions(user.id);
     }
 
     // Create session
     const session = await this.sessionRepository.create({
       user_id: user.id,
       refresh_token: refreshToken,
+      access_token: accessToken,
       device_info: deviceInfo,
       ip_address: ipAddress,
       user_agent: userAgent,
       expires_at: new Date(
         Date.now() +
-          this.parseTimeToMilliseconds(
-            this.jwtConfiguration.refreshTokenExpiresIn,
-          ),
+        this.parseTimeToMilliseconds(
+          this.jwtConfiguration.refreshTokenExpiresIn,
+        ),
       ),
       last_activity_at: new Date(),
     });
+
+    this.logger.debug(`Session created for user: ${user.username}`);
 
     return {
       access_token: accessToken,

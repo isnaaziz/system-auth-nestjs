@@ -5,7 +5,7 @@
 <h1 align="center">NestJS Authentication System</h1>
 
 <p align="center">
-  A comprehensive, production-ready authentication system built with <strong>NestJS</strong>, <strong>TypeORM</strong>, and <strong>MySQL</strong>. Features clean architecture, repository pattern, JWT authentication, session management, and soft delete functionality.
+  A comprehensive, production-ready authentication system built with <strong>NestJS</strong>, <strong>TypeORM</strong>, and <strong>PostgreSQL</strong>. Features clean architecture, repository pattern, JWT authentication, session management, and soft delete functionality.
 </p>
 
 <p align="center">
@@ -16,23 +16,25 @@
 
 ## Features
 
-- **Modern Stack**: NestJS + TypeORM + MySQL + JWT
+- **Modern Stack**: NestJS + TypeORM + PostgreSQL + JWT
 - **Authentication**: Local & JWT strategies with Passport
 - **User Management**: CRUD operations with role-based access
 - **Session Management**: Multiple device support with session tracking
+- **Modular Swagger Documentation**: Clean, organized API documentation with custom decorators
 - **Soft Delete**: Data preservation with logical deletion
 - **Clean Architecture**: Repository pattern with dependency injection
 - **Configuration Management**: Environment-based config with validation
 - **Security**: Password hashing, input validation, CORS protection
 - **Database**: Migrations, seeders, and relationship management
 - **Error Handling**: Global exception filter with proper error responses
+- **Code Organization**: Reusable decorators and response templates
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- MySQL 8.0+
+- PostgreSQL 12+
 - npm or yarn
 
 ### Installation
@@ -52,7 +54,7 @@
    ```env
    # Database Configuration
    DB_HOST=localhost
-   DB_PORT=3306
+   DB_PORT=5432
    DB_USERNAME=your_username
    DB_PASSWORD=your_password
    DB_DATABASE=system_auth
@@ -87,7 +89,13 @@
 
 The application will be running at: `http://localhost:3000/api`
 
+**Swagger Documentation:** `http://localhost:3000/api/docs`
+
 ## API Documentation
+
+**Interactive Swagger UI is available at:** `http://localhost:3000/api/docs`
+
+The API documentation is automatically generated using Swagger/OpenAPI with custom decorators for clean and maintainable code organization.
 
 ### Authentication Endpoints
 
@@ -240,9 +248,14 @@ src/
 ├── entities/               # Database entities
 ├── repositories/           # Data access layer
 ├── config/                 # Configuration management
+│   └── swagger.config.ts   # Centralized Swagger configuration
 ├── common/                 # Shared utilities
 │   ├── filters/           # Exception filters
-│   └── validators/        # Custom validators
+│   ├── validators/        # Custom validators
+│   └── swagger/           # Swagger documentation components
+│       ├── response-templates.ts    # Reusable response schemas
+│       ├── auth-decorators.ts       # Authentication endpoint decorators
+│       └── app-decorators.ts        # System endpoint decorators
 ├── database/              # Database setup and migrations
 └── main.ts               # Application entry point
 ```
@@ -254,6 +267,8 @@ src/
 3. **Repository Pattern**: Data access abstracted through repositories
 4. **Configuration Management**: Environment-based configuration with validation
 5. **Error Handling**: Centralized exception handling with proper HTTP responses
+6. **Modular Documentation**: Swagger decorators organized in reusable components
+7. **Clean Controllers**: Minimal annotations using custom decorators
 
 ### Database Schema
 
@@ -282,6 +297,41 @@ src/
 - `expires_at`
 - `last_activity_at`
 - `created_at`, `updated_at`, `deleted_at`
+
+## Swagger Documentation Architecture
+
+The project uses a modular approach to API documentation with clean separation of concerns:
+
+### Custom Decorators
+- **Authentication Decorators** (`/src/common/swagger/auth-decorators.ts`):
+  - `@ApiRegister()` - User registration endpoint
+  - `@ApiLogin()` - User login endpoint
+  - `@ApiRefreshToken()` - Token refresh endpoint
+  - `@ApiLogout()` - User logout endpoint
+  - `@ApiLogoutAll()` - Logout from all devices
+  - `@ApiGetProfile()` - Get user profile
+  - `@ApiGetSessions()` - Get user sessions
+  - `@ApiDeleteSession()` - Delete specific session
+
+- **System Decorators** (`/src/common/swagger/app-decorators.ts`):
+  - `@ApiWelcome()` - System welcome endpoint
+  - `@ApiHealthCheck()` - Health check endpoint
+
+### Response Templates
+Reusable response schemas defined in `/src/common/swagger/response-templates.ts`:
+- BadRequest (400)
+- Unauthorized (401)
+- Forbidden (403)
+- NotFound (404)
+- Conflict (409)
+- UnprocessableEntity (422)
+- InternalServerError (500)
+
+### Benefits
+- **Clean Controllers**: Minimal Swagger annotations in controller files
+- **Reusable Components**: Common responses and decorators used across endpoints
+- **Maintainable**: Changes to documentation happen in centralized files
+- **Consistent**: Standardized error responses and documentation format
 
 ## Development
 
@@ -323,14 +373,15 @@ npm run test:e2e          # Run end-to-end tests
 3. **Create Repository**: Extend BaseRepository for data access
 4. **Create DTOs**: Define request/response data structures
 5. **Add Validation**: Use class-validator decorators
-6. **Write Tests**: Add unit and integration tests
+6. **Create Swagger Decorators**: Add reusable API documentation decorators
+7. **Write Tests**: Add unit and integration tests
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DB_HOST` | Database host | localhost |
-| `DB_PORT` | Database port | 3306 |
+| `DB_PORT` | Database port | 5432 |
 | `DB_USERNAME` | Database username | - |
 | `DB_PASSWORD` | Database password | - |
 | `DB_DATABASE` | Database name | - |

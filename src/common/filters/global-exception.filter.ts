@@ -77,9 +77,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   private handleDatabaseError(error: QueryFailedError): string {
     const message = error.message;
+    const code = (error as any).code;
 
-    // MySQL specific error handling
-    if (message.includes('Duplicate entry')) {
+    // PostgreSQL specific error handling
+    if (code === '23505') { // unique_violation
       if (message.includes('username')) {
         return 'Username already exists';
       }
@@ -89,15 +90,35 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return 'Duplicate entry found';
     }
 
-    if (message.includes('Data too long')) {
-      return 'Input data exceeds maximum length';
-    }
-
-    if (message.includes('cannot be null')) {
+    if (code === '23502') { // not_null_violation
       return 'Required field is missing';
     }
 
-    if (message.includes('foreign key constraint')) {
+    if (code === '23503') { // foreign_key_violation
+      return 'Referenced record does not exist';
+    }
+
+    if (code === '22001') { // string_data_right_truncation
+      return 'Input data exceeds maximum length';
+    }
+
+    if (code === '22P02') { // invalid_text_representation
+      return 'Invalid data format';
+    }
+
+    if (code === '42703') { // undefined_column
+      return 'Database column error';
+    }
+
+    if (message.includes('duplicate key')) {
+      return 'Duplicate entry found';
+    }
+
+    if (message.includes('violates not-null constraint')) {
+      return 'Required field is missing';
+    }
+
+    if (message.includes('violates foreign key constraint')) {
       return 'Referenced record does not exist';
     }
 

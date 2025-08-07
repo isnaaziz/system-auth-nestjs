@@ -4,17 +4,20 @@ export class CreateUsersTable1691234567890 implements MigrationInterface {
   name = 'CreateUsersTable1691234567890';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Set search path to use the correct schema
+    const schemaName = process.env.DB_SCHEMA || 'system-auth';
+    await queryRunner.query(`SET search_path TO "${schemaName}", public`);
+
     await queryRunner.createTable(
       new Table({
         name: 'users',
         columns: [
           {
             name: 'id',
-            type: 'varchar',
-            length: '36',
+            type: 'uuid',
             isPrimary: true,
             generationStrategy: 'uuid',
-            default: 'uuid()',
+            default: 'gen_random_uuid()',
           },
           {
             name: 'username',
@@ -50,14 +53,14 @@ export class CreateUsersTable1691234567890 implements MigrationInterface {
           },
           {
             name: 'role',
-            type: 'enum',
-            enum: ['admin', 'user', 'moderator'],
+            type: 'varchar',
+            length: '20',
             default: "'user'",
           },
           {
             name: 'status',
-            type: 'enum',
-            enum: ['active', 'inactive', 'suspended'],
+            type: 'varchar',
+            length: '20',
             default: "'active'",
           },
           {
@@ -90,13 +93,12 @@ export class CreateUsersTable1691234567890 implements MigrationInterface {
           {
             name: 'created_at',
             type: 'timestamp',
-            default: 'CURRENT_TIMESTAMP(6)',
+            default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'updated_at',
             type: 'timestamp',
-            default: 'CURRENT_TIMESTAMP(6)',
-            onUpdate: 'CURRENT_TIMESTAMP(6)',
+            default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'deleted_at',

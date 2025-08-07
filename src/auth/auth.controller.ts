@@ -14,6 +14,12 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiProduces,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -21,6 +27,16 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { MessageResponseDto } from './dto/auth-response.dto';
 import { User } from '../entities/user.entity';
+import {
+  ApiRegister,
+  ApiLogin,
+  ApiRefreshToken,
+  ApiLogout,
+  ApiLogoutAll,
+  ApiGetProfile,
+  ApiGetSessions,
+  ApiRevokeSession,
+} from '../common/swagger/auth-decorators';
 
 interface RequestWithUser {
   user: User;
@@ -32,12 +48,16 @@ interface RequestWithUser {
 }
 
 @Controller('auth')
+@ApiTags('Authentication')
 @UseInterceptors(ClassSerializerInterceptor)
+@ApiConsumes('application/json')
+@ApiProduces('application/json')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiRegister()
   async register(@Body(ValidationPipe) registerDto: RegisterDto): Promise<any> {
     return this.authService.register(registerDto);
   }
@@ -45,6 +65,7 @@ export class AuthController {
   @Post('login')
   @UseGuards(AuthGuard('local'))
   @HttpCode(HttpStatus.OK)
+  @ApiLogin()
   async login(
     @Request() req: RequestWithUser,
     @Body() loginDto: LoginDto,
@@ -59,6 +80,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiRefreshToken()
   async refreshToken(
     @Body(ValidationPipe) refreshTokenDto: RefreshTokenDto,
   ): Promise<any> {
@@ -67,7 +89,9 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
+  @ApiLogout()
   async logout(
     @Body() body: { refresh_token: string },
   ): Promise<MessageResponseDto> {
@@ -80,7 +104,9 @@ export class AuthController {
 
   @Post('logout-all')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
+  @ApiLogoutAll()
   async logoutAll(
     @Request() req: RequestWithUser,
   ): Promise<MessageResponseDto> {
@@ -94,6 +120,8 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
+  @ApiGetProfile()
   getProfile(@Request() req: RequestWithUser): Partial<User> {
     const user: User = req.user;
     return user.toJSON();
@@ -101,6 +129,8 @@ export class AuthController {
 
   @Get('sessions')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
+  @ApiGetSessions()
   async getSessions(@Request() req: RequestWithUser): Promise<any[]> {
     const user: User = req.user;
     return this.authService.getUserSessions(user.id);
@@ -108,7 +138,9 @@ export class AuthController {
 
   @Delete('sessions/:sessionId')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
+  @ApiRevokeSession()
   async revokeSession(
     @Request() req: RequestWithUser,
     @Param('sessionId') sessionId: string,

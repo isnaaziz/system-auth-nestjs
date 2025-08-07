@@ -7,27 +7,28 @@ import {
 } from 'typeorm';
 
 export class CreateUserSessionsTable1691234567891
-  implements MigrationInterface
-{
+  implements MigrationInterface {
   name = 'CreateUserSessionsTable1691234567891';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Set search path to use the correct schema
+    const schemaName = process.env.DB_SCHEMA || 'system-auth';
+    await queryRunner.query(`SET search_path TO "${schemaName}", public`);
+
     await queryRunner.createTable(
       new Table({
         name: 'user_sessions',
         columns: [
           {
             name: 'id',
-            type: 'varchar',
-            length: '36',
+            type: 'uuid',
             isPrimary: true,
             generationStrategy: 'uuid',
-            default: 'uuid()',
+            default: 'gen_random_uuid()',
           },
           {
             name: 'user_id',
-            type: 'varchar',
-            length: '36',
+            type: 'uuid',
             isNullable: false,
           },
           {
@@ -57,8 +58,8 @@ export class CreateUserSessionsTable1691234567891
           },
           {
             name: 'status',
-            type: 'enum',
-            enum: ['active', 'expired', 'revoked'],
+            type: 'varchar',
+            length: '20',
             default: "'active'",
           },
           {
@@ -74,13 +75,12 @@ export class CreateUserSessionsTable1691234567891
           {
             name: 'created_at',
             type: 'timestamp',
-            default: 'CURRENT_TIMESTAMP(6)',
+            default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'updated_at',
             type: 'timestamp',
-            default: 'CURRENT_TIMESTAMP(6)',
-            onUpdate: 'CURRENT_TIMESTAMP(6)',
+            default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'deleted_at',

@@ -23,9 +23,11 @@ export enum UserRole {
   MODERATOR = 'moderator',
 }
 
-@Entity('users')
-@Index(['email'], { unique: true })
-@Index(['username'], { unique: true })
+@Entity('users', { schema: 'system-auth' })
+@Index(['email'])
+@Index(['username'])
+@Index(['status'])
+@Index(['role'])
 export class User extends BaseEntity {
   @Column({ length: 50, unique: true })
   @IsNotEmpty()
@@ -47,18 +49,18 @@ export class User extends BaseEntity {
   phone?: string;
 
   @Column({
-    type: 'enum',
-    enum: UserRole,
-    default: UserRole.USER,
+    type: 'varchar',
+    length: 20,
+    default: 'user',
   })
-  role: UserRole;
+  role: string; // Changed from UserRole enum to string
 
   @Column({
-    type: 'enum',
-    enum: UserStatus,
-    default: UserStatus.ACTIVE,
+    type: 'varchar',
+    length: 20,
+    default: 'active',
   })
-  status: UserStatus;
+  status: string; // Changed from UserStatus enum to string
 
   @Column({ type: 'timestamp', nullable: true })
   last_login_at?: Date;
@@ -74,6 +76,9 @@ export class User extends BaseEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   password_reset_expires?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  is_deleted: boolean;
 
   @OneToMany(() => UserSession, (session) => session.user)
   sessions: UserSession[];

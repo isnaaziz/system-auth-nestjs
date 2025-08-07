@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  BeforeUpdate,
+} from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { User } from './user.entity';
 
@@ -8,38 +15,45 @@ export enum SessionStatus {
   REVOKED = 'revoked',
 }
 
-@Entity('user_sessions')
+@Entity('user_sessions', { schema: 'system-auth' })
 @Index(['user_id'])
-@Index(['refresh_token'], { unique: true })
+@Index(['refresh_token'])
+@Index(['status'])
 @Index(['expires_at'])
 export class UserSession extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
 
-  @Column({ length: 500, unique: true })
+  @Column({ length: 255, unique: true })
   refresh_token: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'text' })
+  access_token: string;
+
+  @Column({ type: 'text', nullable: true })
   device_info?: string;
 
-  @Column({ length: 45, nullable: true })
+  @Column({ type: 'inet', nullable: true })
   ip_address?: string;
 
-  @Column({ length: 500, nullable: true })
+  @Column({ type: 'text', nullable: true })
   user_agent?: string;
 
   @Column({
-    type: 'enum',
-    enum: SessionStatus,
-    default: SessionStatus.ACTIVE,
+    type: 'varchar',
+    length: 20,
+    default: 'active',
   })
-  status: SessionStatus;
+  status: string; // Changed to string to match database
 
   @Column({ type: 'timestamp' })
   expires_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
-  last_activity_at?: Date;
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  last_activity_at: Date;
+
+  @Column({ type: 'boolean', default: false })
+  is_deleted: boolean;
 
   @ManyToOne(() => User, (user) => user.sessions, {
     onDelete: 'CASCADE',
@@ -47,11 +61,20 @@ export class UserSession extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  isExpired(): boolean {
-    return this.expires_at < new Date();
+  @BeforeUpdate()
+  updateTimestamp() {
+    this.last_activity_at = new Date();
   }
 
   isActive(): boolean {
-    return this.status === SessionStatus.ACTIVE && !this.isExpired();
+    return (
+      this.status === 'active' &&
+      !this.is_deleted &&
+      new Date() < this.expires_at
+    );
+  }
+
+  isExpired(): boolean {
+    return new Date() >= this.expires_at || this.is_deleted;
   }
 }
