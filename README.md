@@ -4,15 +4,15 @@ Sistem authentication lengkap menggunakan NestJS dengan manajemen user session, 
 
 ## Features
 
-- 🔐 **Authentication System** - Login/Register dengan JWT
-- 👥 **User Management** - CRUD users dengan role-based access
-- 📱 **Session Management** - Multi-device login support dengan refresh tokens
-- 🗑️ **Soft Delete** - Data tidak terhapus permanen dari database
-- 🛡️ **Role-based Access Control** - Admin, User, Moderator roles
-- 🔄 **Database Migrations** - Struktur database yang terversioning
-- 🌱 **Database Seeding** - Admin user otomatis
-- 📝 **Validation** - Input validation dengan class-validator
-- 🔒 **Password Hashing** - Bcrypt untuk keamanan password
+- **Authentication System** - Login/Register dengan JWT
+- **User Management** - CRUD users dengan role-based access
+- **Session Management** - Multi-device login support dengan refresh tokens
+- **Soft Delete** - Data tidak terhapus permanen dari database
+- **Role-based Access Control** - Admin, User, Moderator roles
+- **Database Migrations** - Struktur database yang terversioning
+- **Database Seeding** - Admin user otomatis
+- **Validation** - Input validation dengan class-validator
+- **Password Hashing** - Bcrypt untuk keamanan password
 
 ## Technology Stack
 
@@ -356,8 +356,6 @@ src/
 ## License
 
 This project is private and unlicensed.
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
 ## Description
 
