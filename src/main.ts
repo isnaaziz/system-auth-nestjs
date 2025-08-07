@@ -1,35 +1,53 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties that do not have any decorators
-      forbidNonWhitelisted: true, // Throw error if non-whitelisted values are provided
-      transform: true, // Automatically transform payloads to DTO instances
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      validateCustomDecorators: true,
     }),
   );
 
+  // Global exception filter
+  app.useGlobalFilters(new GlobalExceptionFilter());
+
   // CORS configuration
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost:3001'],
+    origin: configService.get('app.corsOrigin'),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-device-info'],
     credentials: true,
   });
 
   // Global prefix for all routes
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix(configService.get('app.globalPrefix') || 'api');
 
-  const port = process.env.PORT || 3000;
+  const port = configService.get('app.port') || 3000;
+  const globalPrefix = configService.get('app.globalPrefix') || 'api';
+
   await app.listen(port);
 
-  console.log(`🚀 Application is running on: http://localhost:${port}/api`);
-  console.log(`📖 Health check available at: http://localhost:${port}/api/health`);
+  logger.log(
+    `Application is running on: http://localhost:${port}/${globalPrefix}`,
+  );
+  logger.log(
+    `Health check available at: http://localhost:${port}/${globalPrefix}/health`,
+  );
+  logger.log(`Environment: ${configService.get('app.environment')}`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Error starting application:', error);
+  process.exit(1);
+});

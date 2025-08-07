@@ -1,152 +1,98 @@
 import {
-    Injectable,
-    NotFoundException,
-    ConflictException,
+  Injectable,
+  NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
 import { User } from '../entities/user.entity';
-import { UserSession, SessionStatus } from '../entities/user-session.entity';
+import { UserSession } from '../entities/user-session.entity';
+import { UserRepository } from '../common/repositories/user.repository';
+import { UserSessionRepository } from '../common/repositories/user-session.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { IPaginationResult } from '../common/repositories/base.repository';
 
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectRepository(User)
-        private readonly userRepository: Repository<User>,
-        @InjectRepository(UserSession)
-        private readonly sessionRepository: Repository<UserSession>,
-    ) { }
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly sessionRepository: UserSessionRepository,
+  ) {}
 
-    async findAll(page: number = 1, limit: number = 10, search?: string) {
-        const skip = (page - 1) * limit;
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<IPaginationResult<User>> {
+    return this.userRepository.findWithPaginationAndSearch(
+      { page, limit },
+      search,
+    );
+  }
 
-        const queryBuilder = this.userRepository
-            .createQueryBuilder('user')
-            .select([
-                'user.id',
-                'user.username',
-                'user.email',
-                'user.full_name',
-                'user.phone',
-                'user.role',
-                'user.status',
-                'user.last_login_at',
-                'user.email_verified_at',
-                'user.created_at',
-                'user.updated_at'
-            ])
-            .skip(skip)
-            .take(limit)
-            .orderBy('user.created_at', 'DESC');
+  async findOne(id: string): Promise<User> {
+    const user = await this.userRepository.findByIdWithoutPassword(id);
 
-        if (search) {
-            queryBuilder.where(
-                'user.username LIKE :search OR user.email LIKE :search OR user.full_name LIKE :search',
-                { search: `%${search}%` }
-            );
-        }
-
-        const [users, total] = await queryBuilder.getManyAndCount();
-
-        return {
-            data: users,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    async findOne(id: string): Promise<User> {
-        const user = await this.userRepository.findOne({
-            where: { id },
-            select: [
-                'id', 'username', 'email', 'full_name', 'phone', 'role', 'status',
-                'last_login_at', 'email_verified_at', 'created_at', 'updated_at'
-            ],
-        });
+    return user;
+  }
 
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    // Check if user already exists
+    const userExists = await this.userRepository.existsByUsernameOrEmail(
+      createUserDto.username,
+      createUserDto.email,
+    );
 
-        return user;
+    if (userExists) {
+      throw new ConflictException('Username or email already exists');
     }
 
-    async create(createUserDto: CreateUserDto): Promise<User> {
-        // Check if user already exists
-        const existingUser = await this.userRepository.findOne({
-            where: [
-                { username: createUserDto.username },
-                { email: createUserDto.email },
-            ],
-        });
+    const user = await this.userRepository.create(createUserDto);
 
-        if (existingUser) {
-            throw new ConflictException('Username or email already exists');
-        }
+    // Return user without password
+    return this.findOne(user.id);
+  }
 
-        const user = this.userRepository.create(createUserDto);
-        const savedUser = await this.userRepository.save(user);
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    const user = await this.findOne(id);
 
-        // Return user without password
-        return this.findOne(savedUser.id);
+    // Check if username or email is being changed and already exists
+    if (updateUserDto.username || updateUserDto.email) {
+      const userExists = await this.userRepository.existsByUsernameOrEmail(
+        updateUserDto.username || user.username,
+        updateUserDto.email || user.email,
+        id,
+      );
+
+      if (userExists) {
+        throw new ConflictException('Username or email already exists');
+      }
     }
 
-    async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-        const user = await this.findOne(id);
+    await this.userRepository.update(id, updateUserDto);
+    return this.findOne(id);
+  }
 
-        // Check if username or email is being changed and already exists
-        if (updateUserDto.username || updateUserDto.email) {
-            const existingUser = await this.userRepository
-                .createQueryBuilder('user')
-                .where('user.id != :id', { id })
-                .andWhere('(user.username = :username OR user.email = :email)', {
-                    username: updateUserDto.username || '',
-                    email: updateUserDto.email || '',
-                })
-                .getOne();
+  async remove(id: string): Promise<void> {
+    await this.findOne(id); // Check if user exists
+    await this.userRepository.softDelete(id);
+  }
 
-            if (existingUser) {
-                throw new ConflictException('Username or email already exists');
-            }
-        }
+  async restore(id: string): Promise<User> {
+    await this.userRepository.restore(id);
+    return this.findOne(id);
+  }
 
-        Object.assign(user, updateUserDto);
-        await this.userRepository.save(user);
+  async getUserSessions(userId: string): Promise<UserSession[]> {
+    await this.findOne(userId); // Check if user exists
+    return this.sessionRepository.getUserSessionsById(userId);
+  }
 
-        return this.findOne(id);
-    }
-
-    async remove(id: string): Promise<void> {
-        const user = await this.findOne(id);
-        await this.userRepository.softDelete(id);
-    }
-
-    async restore(id: string): Promise<User> {
-        await this.userRepository.restore(id);
-        return this.findOne(id);
-    }
-
-    async getUserSessions(userId: string): Promise<UserSession[]> {
-        await this.findOne(userId); // Check if user exists
-
-        return this.sessionRepository.find({
-            where: { user_id: userId },
-            order: { last_activity_at: 'DESC' },
-        });
-    }
-
-    async revokeAllUserSessions(userId: string): Promise<void> {
-        await this.findOne(userId); // Check if user exists
-
-        await this.sessionRepository.update(
-            { user_id: userId, status: SessionStatus.ACTIVE },
-            { status: SessionStatus.REVOKED },
-        );
-    }
+  async revokeAllUserSessions(userId: string): Promise<void> {
+    await this.findOne(userId); // Check if user exists
+    await this.sessionRepository.revokeAllUserSessions(userId);
+  }
 }

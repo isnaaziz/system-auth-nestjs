@@ -1,201 +1,234 @@
 import {
-    Injectable,
-    UnauthorizedException,
-    ConflictException,
-    BadRequestException,
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  Inject,
 } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { User, UserStatus } from '../entities/user.entity';
 import { UserSession, SessionStatus } from '../entities/user-session.entity';
+import { UserRepository } from '../common/repositories/user.repository';
+import { UserSessionRepository } from '../common/repositories/user-session.repository';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
+import jwtConfig from '../config/jwt.config';
+import sessionConfig from '../config/session.config';
 
 export interface AuthResponse {
-    access_token: string;
-    refresh_token: string;
-    user: Partial<User>;
-    expires_in: number;
+  access_token: string;
+  refresh_token: string;
+  user: Partial<User>;
+  expires_in: number;
 }
 
 @Injectable()
 export class AuthService {
-    constructor(
-        @InjectRepository(User)
-        private readonly userRepository: Repository<User>,
-        @InjectRepository(UserSession)
-        private readonly sessionRepository: Repository<UserSession>,
-        private readonly jwtService: JwtService,
-    ) { }
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly sessionRepository: UserSessionRepository,
+    private readonly jwtService: JwtService,
+    @Inject(jwtConfig.KEY)
+    private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
+    @Inject(sessionConfig.KEY)
+    private readonly sessionConfiguration: ConfigType<typeof sessionConfig>,
+  ) {}
 
-    async validateUser(username: string, password: string): Promise<User | null> {
-        const user = await this.userRepository.findOne({
-            where: [{ username }, { email: username }],
-        });
+  async validateUser(username: string, password: string): Promise<User | null> {
+    const user = await this.userRepository.findByUsernameOrEmail(username);
 
-        if (!user || user.status !== UserStatus.ACTIVE) {
-            return null;
-        }
-
-        const isPasswordValid = await user.validatePassword(password);
-        if (!isPasswordValid) {
-            return null;
-        }
-
-        return user;
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      return null;
     }
 
-    async register(registerDto: RegisterDto): Promise<AuthResponse> {
-        // Check if user already exists
-        const existingUser = await this.userRepository.findOne({
-            where: [
-                { username: registerDto.username },
-                { email: registerDto.email },
-            ],
-        });
-
-        if (existingUser) {
-            throw new ConflictException('Username or email already exists');
-        }
-
-        // Create new user
-        const user = this.userRepository.create(registerDto);
-        const savedUser = await this.userRepository.save(user);
-
-        // Generate tokens and create session
-        return this.generateTokensAndSession(savedUser);
+    const isPasswordValid = await user.validatePassword(password);
+    if (!isPasswordValid) {
+      return null;
     }
 
-    async login(
-        loginDto: LoginDto,
-        deviceInfo?: string,
-        ipAddress?: string,
-        userAgent?: string,
-    ): Promise<AuthResponse> {
-        const user = await this.validateUser(loginDto.username, loginDto.password);
+    return user;
+  }
 
-        if (!user) {
-            throw new UnauthorizedException('Invalid credentials');
-        }
+  async register(registerDto: RegisterDto): Promise<AuthResponse> {
+    // Check if user already exists
+    const userExists = await this.userRepository.existsByUsernameOrEmail(
+      registerDto.username,
+      registerDto.email,
+    );
 
-        // Update last login
-        user.last_login_at = new Date();
-        await this.userRepository.save(user);
-
-        // Generate tokens and create session
-        return this.generateTokensAndSession(user, deviceInfo, ipAddress, userAgent);
+    if (userExists) {
+      throw new ConflictException('Username or email already exists');
     }
 
-    async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthResponse> {
-        const session = await this.sessionRepository.findOne({
-            where: { refresh_token: refreshTokenDto.refresh_token },
-            relations: ['user'],
-        });
+    // Create new user
+    const user = await this.userRepository.create(registerDto);
 
-        if (!session || !session.isActive()) {
-            throw new UnauthorizedException('Invalid or expired refresh token');
-        }
+    // Generate tokens and create session
+    return this.generateTokensAndSession(user);
+  }
 
-        // Update session activity
-        session.last_activity_at = new Date();
-        await this.sessionRepository.save(session);
+  async login(
+    loginDto: LoginDto,
+    deviceInfo?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthResponse> {
+    const user = await this.validateUser(loginDto.username, loginDto.password);
 
-        // Generate new tokens
-        return this.generateTokensAndSession(session.user);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    async logout(refreshToken: string): Promise<void> {
-        const session = await this.sessionRepository.findOne({
-            where: { refresh_token: refreshToken },
-        });
+    // Update last login
+    await this.userRepository.update(user.id, { last_login_at: new Date() });
 
-        if (session) {
-            session.status = SessionStatus.REVOKED;
-            await this.sessionRepository.save(session);
-        }
+    // Generate tokens and create session
+    return this.generateTokensAndSession(
+      user,
+      deviceInfo,
+      ipAddress,
+      userAgent,
+    );
+  }
+
+  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthResponse> {
+    const session = await this.sessionRepository.findByRefreshToken(
+      refreshTokenDto.refresh_token,
+    );
+
+    if (!session || !session.isActive()) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    async logoutAllSessions(userId: string): Promise<void> {
-        await this.sessionRepository.update(
-            { user_id: userId, status: SessionStatus.ACTIVE },
-            { status: SessionStatus.REVOKED },
+    // Update session activity
+    await this.sessionRepository.update(session.id, {
+      last_activity_at: new Date(),
+    });
+
+    // Generate new tokens
+    return this.generateTokensAndSession(session.user);
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    const session =
+      await this.sessionRepository.findByRefreshToken(refreshToken);
+
+    if (session) {
+      await this.sessionRepository.update(session.id, {
+        status: SessionStatus.REVOKED,
+      });
+    }
+  }
+
+  async logoutAllSessions(userId: string): Promise<void> {
+    await this.sessionRepository.revokeAllUserSessions(userId);
+  }
+
+  async revokeSession(sessionId: string, userId: string): Promise<void> {
+    const session = await this.sessionRepository.findById(sessionId);
+
+    if (!session || session.user_id !== userId) {
+      throw new BadRequestException('Session not found');
+    }
+
+    await this.sessionRepository.revokeSession(sessionId);
+  }
+
+  async getUserSessions(userId: string): Promise<UserSession[]> {
+    return this.sessionRepository.findActiveSessionsByUserId(userId);
+  }
+
+  async cleanupExpiredSessions(): Promise<void> {
+    await this.sessionRepository.cleanupExpiredSessions();
+  }
+
+  private async generateTokensAndSession(
+    user: User,
+    deviceInfo?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthResponse> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.jwtConfiguration.accessTokenExpiresIn,
+    });
+
+    const refreshToken = uuidv4();
+    const expiresInSeconds = this.parseTimeToSeconds(
+      this.jwtConfiguration.accessTokenExpiresIn,
+    );
+
+    // Check session limit
+    const activeSessionsCount =
+      await this.sessionRepository.countActiveSessionsByUserId(user.id);
+
+    if (activeSessionsCount >= this.sessionConfiguration.maxActiveSessions) {
+      // Revoke oldest session
+      const oldestSessions =
+        await this.sessionRepository.findActiveSessionsByUserId(user.id);
+      if (oldestSessions.length > 0) {
+        await this.sessionRepository.revokeSession(
+          oldestSessions[oldestSessions.length - 1].id,
         );
+      }
     }
 
-    async revokeSession(sessionId: string, userId: string): Promise<void> {
-        const session = await this.sessionRepository.findOne({
-            where: { id: sessionId, user_id: userId },
-        });
+    // Create session
+    const session = await this.sessionRepository.create({
+      user_id: user.id,
+      refresh_token: refreshToken,
+      device_info: deviceInfo,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      expires_at: new Date(
+        Date.now() +
+          this.parseTimeToMilliseconds(
+            this.jwtConfiguration.refreshTokenExpiresIn,
+          ),
+      ),
+      last_activity_at: new Date(),
+    });
 
-        if (!session) {
-            throw new BadRequestException('Session not found');
-        }
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: user.toJSON(),
+      expires_in: expiresInSeconds,
+    };
+  }
 
-        session.status = SessionStatus.REVOKED;
-        await this.sessionRepository.save(session);
+  private parseTimeToSeconds(timeString: string): number {
+    const match = timeString.match(/^(\d+)([smhd])$/);
+    if (!match) return 15 * 60; // default 15 minutes
+
+    const value = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 60 * 60;
+      case 'd':
+        return value * 24 * 60 * 60;
+      default:
+        return 15 * 60;
     }
+  }
 
-    async getUserSessions(userId: string): Promise<UserSession[]> {
-        return this.sessionRepository.find({
-            where: { user_id: userId, status: SessionStatus.ACTIVE },
-            order: { last_activity_at: 'DESC' },
-        });
-    }
-
-    async cleanupExpiredSessions(): Promise<void> {
-        const expiredSessions = await this.sessionRepository
-            .createQueryBuilder()
-            .update(UserSession)
-            .set({ status: SessionStatus.EXPIRED })
-            .where('expires_at < :now AND status = :status', {
-                now: new Date(),
-                status: SessionStatus.ACTIVE,
-            })
-            .execute();
-    }
-
-    private async generateTokensAndSession(
-        user: User,
-        deviceInfo?: string,
-        ipAddress?: string,
-        userAgent?: string,
-    ): Promise<AuthResponse> {
-        const payload: JwtPayload = {
-            sub: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-        };
-
-        const accessToken = this.jwtService.sign(payload, {
-            expiresIn: process.env.JWT_EXPIRES_IN || '15m',
-        });
-
-        const refreshToken = uuidv4();
-        const expiresIn = 15 * 60; // 15 minutes in seconds
-
-        // Create session
-        const session = this.sessionRepository.create({
-            user_id: user.id,
-            refresh_token: refreshToken,
-            device_info: deviceInfo,
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-            last_activity_at: new Date(),
-        });
-
-        await this.sessionRepository.save(session);
-
-        return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: user.toJSON(),
-            expires_in: expiresIn,
-        };
-    }
+  private parseTimeToMilliseconds(timeString: string): number {
+    return this.parseTimeToSeconds(timeString) * 1000;
+  }
 }

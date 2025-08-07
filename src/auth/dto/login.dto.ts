@@ -1,12 +1,14 @@
 import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { Trim } from '../../common/validators/custom-validators';
 
 export class LoginDto {
-    @IsNotEmpty()
-    @IsString()
-    username: string;
+  @IsString()
+  @IsNotEmpty({ message: 'Username or email is required' })
+  @Trim()
+  username: string;
 
-    @IsNotEmpty()
-    @IsString()
-    @MinLength(6)
-    password: string;
+  @IsString()
+  @IsNotEmpty({ message: 'Password is required' })
+  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  password: string;
 }

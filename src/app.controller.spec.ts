@@ -16,7 +16,9 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return welcome message', () => {
-      expect(appController.getHello()).toBe('System Authentication API is running! 🚀');
+      expect(appController.getHello()).toBe(
+        'System Authentication API is running!',
+      );
     });
   });
 
