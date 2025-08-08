@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Inject,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -16,6 +17,7 @@ import { UserSessionRepository } from '../common/repositories/user-session.repos
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import jwtConfig from '../config/jwt.config';
 import sessionConfig from '../config/session.config';
@@ -261,5 +263,45 @@ export class AuthService {
 
   private parseTimeToMilliseconds(timeString: string): number {
     return this.parseTimeToSeconds(timeString) * 1000;
+  }
+
+  async updateProfile(userId: string, updateDto: UpdateProfileDto): Promise<User> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user || user.is_deleted) {
+      throw new NotFoundException('User not found');
+    }
+
+    return await this.userRepository.update(userId, updateDto);
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string, filename: string): Promise<User> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user || user.is_deleted) {
+      throw new NotFoundException('User not found');
+    }
+
+    return await this.userRepository.update(userId, {
+      avatar_url: avatarUrl,
+      avatar_filename: filename,
+    });
+  }
+
+  async deleteAvatar(userId: string): Promise<{ user: User; oldFilename?: string }> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user || user.is_deleted) {
+      throw new NotFoundException('User not found');
+    }
+
+    const oldFilename = user.avatar_filename;
+
+    const updatedUser = await this.userRepository.update(userId, {
+      avatar_url: undefined,
+      avatar_filename: undefined,
+    });
+
+    return { user: updatedUser, oldFilename };
   }
 }

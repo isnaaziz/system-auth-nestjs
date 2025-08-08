@@ -48,19 +48,28 @@ export class User extends BaseEntity {
   @Column({ length: 20, nullable: true })
   phone?: string;
 
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ length: 500, nullable: true })
+  avatar_url?: string;
+
+  @Column({ length: 100, nullable: true })
+  avatar_filename?: string;
+
   @Column({
     type: 'varchar',
     length: 20,
     default: 'user',
   })
-  role: string; // Changed from UserRole enum to string
+  role: string;
 
   @Column({
     type: 'varchar',
     length: 20,
     default: 'active',
   })
-  status: string; // Changed from UserStatus enum to string
+  status: string;
 
   @Column({ type: 'timestamp', nullable: true })
   last_login_at?: Date;

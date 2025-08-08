@@ -9,6 +9,7 @@ import { User } from '../entities/user.entity';
 import { UserSession } from '../entities/user-session.entity';
 import { UserRepository } from '../common/repositories/user.repository';
 import { UserSessionRepository } from '../common/repositories/user-session.repository';
+import { FileUploadService } from '../common/services/file-upload.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import jwtConfig from '../config/jwt.config';
@@ -33,9 +34,10 @@ import jwtConfig from '../config/jwt.config';
     AuthService,
     UserRepository,
     UserSessionRepository,
+    FileUploadService,
     JwtStrategy,
     LocalStrategy,
   ],
   exports: [AuthService, UserRepository, UserSessionRepository],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -1,11 +1,13 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOperation, ApiBody, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
+import { ApiOperation, ApiBody, ApiResponse, ApiParam, ApiHeader, ApiConsumes } from '@nestjs/swagger';
 import { RegisterDto } from '../../auth/dto/register.dto';
 import { LoginDto } from '../../auth/dto/login.dto';
 import { RefreshTokenDto } from '../../auth/dto/refresh-token.dto';
 import { LogoutDto } from '../../auth/dto/logout.dto';
+import { UpdateProfileDto } from '../../auth/dto/update-profile.dto';
 import { AuthResponseDto, MessageResponseDto, UserSessionDto } from '../../auth/dto/auth-response.dto';
 import { UserProfileDto } from '../../auth/dto/user-profile.dto';
+import { PhotoUploadResponseDto, PhotoDeleteResponseDto } from '../../auth/dto/photo-response.dto';
 import { CommonResponses } from './response-templates';
 
 export function ApiRegister() {
@@ -189,5 +191,101 @@ export function ApiRevokeSession() {
         ApiResponse(CommonResponses.Unauthorized),
         ApiResponse(CommonResponses.NotFound),
         ApiResponse(CommonResponses.BadRequest),
+    );
+}
+
+export function ApiUpdateProfile() {
+    return applyDecorators(
+        ApiOperation({
+            summary: 'Update user profile',
+            description: 'Updates the current user profile information such as full name, phone, and bio.',
+        }),
+        ApiBody({
+            type: UpdateProfileDto,
+            description: 'Profile information to update',
+            examples: {
+                partial: {
+                    summary: 'Partial update',
+                    value: {
+                        full_name: 'John Doe Updated',
+                    },
+                },
+                complete: {
+                    summary: 'Complete update',
+                    value: {
+                        full_name: 'John Doe',
+                        phone: '+1234567890',
+                        bio: 'Software Developer passionate about technology',
+                    },
+                },
+            },
+        }),
+        ApiResponse({
+            status: 200,
+            description: 'Profile updated successfully',
+            type: UserProfileDto,
+        }),
+        ApiResponse(CommonResponses.Unauthorized),
+        ApiResponse(CommonResponses.BadRequest),
+        ApiResponse(CommonResponses.NotFound),
+    );
+}
+
+export function ApiUploadPhoto() {
+    return applyDecorators(
+        ApiOperation({
+            summary: 'Upload profile photo',
+            description: 'Uploads a new profile photo for the current user. Supports JPEG, PNG, GIF, and WebP formats up to 5MB.',
+        }),
+        ApiConsumes('multipart/form-data'),
+        ApiBody({
+            description: 'Profile photo file',
+            schema: {
+                type: 'object',
+                properties: {
+                    photo: {
+                        type: 'string',
+                        format: 'binary',
+                        description: 'Profile photo file (JPEG, PNG, GIF, WebP - max 5MB)',
+                    },
+                },
+                required: ['photo'],
+            },
+        }),
+        ApiResponse({
+            status: 200,
+            description: 'Photo uploaded successfully',
+            type: PhotoUploadResponseDto,
+        }),
+        ApiResponse(CommonResponses.Unauthorized),
+        ApiResponse(CommonResponses.BadRequest),
+        ApiResponse({
+            status: 413,
+            description: 'File too large',
+            schema: {
+                type: 'object',
+                properties: {
+                    statusCode: { type: 'number', example: 413 },
+                    message: { type: 'string', example: 'File size exceeds limit of 5MB' },
+                    error: { type: 'string', example: 'Payload Too Large' },
+                },
+            },
+        }),
+    );
+}
+
+export function ApiDeletePhoto() {
+    return applyDecorators(
+        ApiOperation({
+            summary: 'Delete profile photo',
+            description: 'Removes the current user profile photo.',
+        }),
+        ApiResponse({
+            status: 200,
+            description: 'Photo deleted successfully',
+            type: PhotoDeleteResponseDto,
+        }),
+        ApiResponse(CommonResponses.Unauthorized),
+        ApiResponse(CommonResponses.NotFound),
     );
 }

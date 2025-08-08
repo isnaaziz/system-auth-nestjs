@@ -38,27 +38,27 @@ async function runMigrations() {
     dataSource = AppDataSource;
     await dataSource.initialize();
 
-    console.log('✅ Database connection established successfully!');
+    console.log('Database connection established successfully!');
 
     console.log('Running migrations...');
     await dataSource.runMigrations();
-    console.log('✅ Migrations completed successfully!');
+    console.log('Migrations completed successfully!');
 
     console.log('Running seeders...');
     const seeder = new CreateAdminUserSeeder();
     await seeder.run(dataSource);
-    console.log('✅ Seeders completed successfully!');
+    console.log('Seeders completed successfully!');
 
-    console.log('🎉 Database setup completed successfully!');
+    console.log('Database setup completed successfully!');
     console.log(`Database: ${dataSource.options.database}`);
     console.log(`Schema: ${process.env.DB_SCHEMA || 'public'}`);
 
   } catch (error) {
-    console.error('❌ Error during database setup:', error);
+    console.error('Error during database setup:', error);
 
-    // Check if it's a connection error
+
     if (error.message?.includes('SASL') || error.message?.includes('password')) {
-      console.error('🔑 Authentication failed. Please check:');
+      console.error('Authentication failed. Please check:');
       console.error('   - DB_USERNAME is correct');
       console.error('   - DB_PASSWORD is correct');
       console.error('   - PostgreSQL server is running');
@@ -70,9 +70,9 @@ async function runMigrations() {
     if (dataSource && dataSource.isInitialized) {
       try {
         await dataSource.destroy();
-        console.log('✅ Database connection closed.');
+        console.log('Database connection closed.');
       } catch (destroyError) {
-        console.error('⚠️  Error closing database connection:', destroyError);
+        console.error('Error closing database connection:', destroyError);
       }
     }
   }

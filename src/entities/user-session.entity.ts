@@ -44,7 +44,7 @@ export class UserSession extends BaseEntity {
     length: 20,
     default: 'active',
   })
-  status: string; // Changed to string to match database
+  status: string;
 
   @Column({ type: 'timestamp' })
   expires_at: Date;

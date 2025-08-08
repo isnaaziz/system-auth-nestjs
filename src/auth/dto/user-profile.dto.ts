@@ -39,6 +39,22 @@ export class UserProfileDto {
     phone?: string;
 
     @ApiProperty({
+        description: 'User bio or description',
+        example: 'Software Developer passionate about technology',
+        type: String,
+        required: false,
+    })
+    bio?: string;
+
+    @ApiProperty({
+        description: 'User avatar/profile photo URL',
+        example: 'http://localhost:3000/uploads/avatars/user-id-123.jpg',
+        type: String,
+        required: false,
+    })
+    avatar_url?: string;
+
+    @ApiProperty({
         description: 'User role',
         example: 'admin',
         type: String,
