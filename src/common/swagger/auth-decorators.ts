@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOperation, ApiBody, ApiResponse, ApiParam, ApiHeader, ApiConsumes } from '@nestjs/swagger';
+import { ApiOperation, ApiBody, ApiResponse, ApiParam, ApiHeader, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { RegisterDto } from '../../auth/dto/register.dto';
 import { LoginDto } from '../../auth/dto/login.dto';
 import { RefreshTokenDto } from '../../auth/dto/refresh-token.dto';
@@ -9,6 +9,9 @@ import { AuthResponseDto, MessageResponseDto, UserSessionDto } from '../../auth/
 import { UserProfileDto } from '../../auth/dto/user-profile.dto';
 import { PhotoUploadResponseDto, PhotoDeleteResponseDto } from '../../auth/dto/photo-response.dto';
 import { CommonResponses } from './response-templates';
+import { InviteDto, AcceptInviteDto, RevokeInviteDto, UpdateMemberRoleDto } from '../../team/dto/invite.dto';
+import { InviteEntityDto, AcceptInviteResponseDto, RevokeInviteResponseDto, PurgeExpiredResponseDto, TeamMemberDto } from '../../team/dto/invite-response.dto';
+import { TeamInviteStatus } from '../../entities/team-invite.entity';
 
 export function ApiRegister() {
     return applyDecorators(
@@ -287,5 +290,44 @@ export function ApiDeletePhoto() {
         }),
         ApiResponse(CommonResponses.Unauthorized),
         ApiResponse(CommonResponses.NotFound),
+    );
+}
+
+export function ApiListInvites() {
+    return applyDecorators(
+        ApiOperation({ summary: 'List team invites', description: 'List all team invites optionally filtered by status.' }),
+        ApiQuery({ name: 'status', enum: TeamInviteStatus, required: false }),
+        ApiResponse({ status: 200, description: 'Invites listed successfully', schema: { properties: { invites: { type: 'array', items: { $ref: '#/components/schemas/InviteEntityDto' } } } } }),
+    );
+}
+
+export function ApiInviteMember() {
+    return applyDecorators(
+        ApiOperation({ summary: 'Invite a member', description: 'Create a new team invitation or auto add existing user.' }),
+        ApiBody({ type: InviteDto, examples: { basic: { value: { email: 'new.user@example.com', role: 'user' } }, withNote: { value: { email: 'designer@example.com', role: 'moderator', note: 'Join design board', expires_in: 86400 } } } }),
+        ApiResponse({ status: 201, description: 'Invitation created', type: InviteEntityDto }),
+    );
+}
+
+export function ApiAcceptInvite() {
+    return applyDecorators(
+        ApiOperation({ summary: 'Accept invitation', description: 'Accept invite and auto login returning tokens.' }),
+        ApiBody({ type: AcceptInviteDto, examples: { complete: { value: { token: 'abc123token', username: 'newmember', password: 'Pass1234', full_name: 'New Member' } }, existing: { value: { token: 'existingusertoken' } } } }),
+        ApiResponse({ status: 200, description: 'Invitation accepted', type: AcceptInviteResponseDto }),
+    );
+}
+
+export function ApiRevokeInvite() {
+    return applyDecorators(
+        ApiOperation({ summary: 'Revoke invitation', description: 'Revoke a pending team invite.' }),
+        ApiBody({ type: RevokeInviteDto, examples: { example: { value: { inviteId: 'uuid-of-invite' } } } }),
+        ApiResponse({ status: 200, description: 'Invitation revoked', type: RevokeInviteResponseDto }),
+    );
+}
+
+export function ApiPurgeInvites() {
+    return applyDecorators(
+        ApiOperation({ summary: 'Purge expired invites', description: 'Mark all expired pending invites as EXPIRED.' }),
+        ApiResponse({ status: 200, description: 'Expired invites processed', type: PurgeExpiredResponseDto }),
     );
 }

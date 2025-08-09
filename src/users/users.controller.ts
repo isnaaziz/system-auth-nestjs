@@ -11,6 +11,7 @@ import {
   ValidationPipe,
   HttpCode,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
@@ -23,7 +24,25 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Controller('users')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
+
+  @Get('me')
+  async getMe(@Request() req: any) {
+    const u = req.user;
+    return {
+      user: {
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        full_name: u.full_name,
+        role: u.role,
+        status: u.status,
+        last_login_at: u.last_login_at,
+        created_at: u.created_at,
+        updated_at: u.updated_at,
+      },
+    };
+  }
 
   @Get()
   @Roles(UserRole.ADMIN)

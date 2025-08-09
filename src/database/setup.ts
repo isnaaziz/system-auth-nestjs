@@ -6,6 +6,7 @@ import { UserSession } from '../entities/user-session.entity';
 import { CreateSystemAuthSchema1691234567889 } from './migrations/1691234567889-CreateSystemAuthSchema';
 import { CreateUsersTable1691234567890 } from './migrations/1691234567890-CreateUsersTable';
 import { CreateUserSessionsTable1691234567891 } from './migrations/1691234567891-CreateUserSessionsTable';
+import { CreateTeamInvitesTable1733788800001 } from './migrations/1733788800001-CreateTeamInvitesTable';
 import { CreateAdminUserSeeder } from './seeders/create-admin-user.seeder';
 
 const AppDataSource = new DataSource({
@@ -23,6 +24,7 @@ const AppDataSource = new DataSource({
     CreateSystemAuthSchema1691234567889,
     CreateUsersTable1691234567890,
     CreateUserSessionsTable1691234567891,
+    CreateTeamInvitesTable1733788800001
   ],
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
