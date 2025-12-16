@@ -166,4 +166,19 @@ export class UserRepository extends BaseRepository<User> {
       throw error;
     }
   }
+
+  async findByPasswordResetToken(token: string): Promise<User | null> {
+    try {
+      return await this.repository.findOne({
+        where: { password_reset_token: token, is_deleted: false },
+      });
+    } catch (error) {
+      console.error('Error finding user by reset token:', error);
+      throw error;
+    }
+  }
+
+  async save(user: User): Promise<User> {
+    return this.repository.save(user);
+  }
 }

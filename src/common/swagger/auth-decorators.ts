@@ -12,6 +12,35 @@ import { CommonResponses } from './response-templates';
 import { InviteDto, AcceptInviteDto, RevokeInviteDto, UpdateMemberRoleDto } from '../../team/dto/invite.dto';
 import { InviteEntityDto, AcceptInviteResponseDto, RevokeInviteResponseDto, PurgeExpiredResponseDto, TeamMemberDto } from '../../team/dto/invite-response.dto';
 import { TeamInviteStatus } from '../../entities/team-invite.entity';
+import { ChangePasswordDto } from '../../auth/dto/change-password.dto';
+
+export function ApiChangePassword() {
+    return applyDecorators(
+        ApiOperation({
+            summary: 'Change password',
+            description: 'Change the current user password by providing old and new password.',
+        }),
+        ApiBody({
+            type: ChangePasswordDto,
+            description: 'Password change request',
+            examples: {
+                example: {
+                    value: {
+                        current_password: 'OldPassword123!',
+                        new_password: 'NewPassword123!',
+                    },
+                },
+            },
+        }),
+        ApiResponse({
+            status: 200,
+            description: 'Password changed successfully',
+            type: MessageResponseDto,
+        }),
+        ApiResponse(CommonResponses.Unauthorized),
+        ApiResponse(CommonResponses.BadRequest),
+    );
+}
 
 export function ApiRegister() {
     return applyDecorators(

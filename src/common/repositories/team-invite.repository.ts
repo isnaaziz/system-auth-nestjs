@@ -24,4 +24,8 @@ export class TeamInviteRepository extends BaseRepository<TeamInvite> {
     async softDelete(id: string): Promise<void> {
         await this.repository.update(id, { is_deleted: true } as any);
     }
+
+    async save(invite: TeamInvite): Promise<TeamInvite> {
+        return this.repository.save(invite);
+    }
 }

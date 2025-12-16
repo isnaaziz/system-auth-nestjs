@@ -24,7 +24,7 @@ export class UserSession extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
 
-  @Column({ length: 255, unique: true })
+  @Column({ length: 255, unique: true, nullable: true })
   refresh_token: string;
 
   @Column({ type: 'text' })

@@ -13,6 +13,8 @@ import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import appConfig from './config/app.config';
 import sessionConfig from './config/session.config';
+import { ProjectModule } from './project/project.module';
+import { TaskModule } from './task/task.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import sessionConfig from './config/session.config';
       serveRoot: '/uploads',
     }),
     RoutesModule,
+    ProjectModule,
+    TaskModule,
   ],
   controllers: [AppController],
   providers: [AppService, SessionCleanupTask],

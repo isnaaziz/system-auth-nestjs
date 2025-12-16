@@ -304,4 +304,61 @@ export class AuthService {
 
     return { user: updatedUser, oldFilename };
   }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findByEmail(email);
+
+    if (!user) {
+      return { message: 'If your email exists in our system, you will receive a password reset link.' };
+    }
+
+    const resetToken = uuidv4();
+    const expires = new Date();
+    expires.setHours(expires.getHours() + 1);
+
+    await this.userRepository.update(user.id, {
+      password_reset_token: resetToken,
+      password_reset_expires: expires,
+    });
+
+    this.logger.log(`Password reset token for ${email}: ${resetToken}`);
+
+    return { message: `Password reset link generated. Token: ${resetToken}` };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findByPasswordResetToken(token);
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    if (user.password_reset_expires && user.password_reset_expires < new Date()) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    user.password = newPassword;
+    user.password_reset_token = undefined;
+    user.password_reset_expires = undefined;
+
+    await this.userRepository.save(user);
+
+    return { message: 'Password has been reset successfully' };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isPasswordValid = await user.validatePassword(currentPassword);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid current password');
+    }
+
+    user.password = newPassword;
+    await this.userRepository.save(user); // Hooks will hash the password
+  }
 }

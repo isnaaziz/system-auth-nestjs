@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Request, UseGuards, ValidationPipe, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../entities/user.entity';
@@ -13,7 +15,7 @@ import { InviteEntityDto, RevokeInviteResponseDto, PurgeExpiredResponseDto, Team
 @ApiTags('Team')
 @ApiBearerAuth('JWT-auth')
 @Controller('team')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TeamController {
     constructor(private readonly teamService: TeamService) { }
 
@@ -22,7 +24,14 @@ export class TeamController {
     @ApiResponse({ status: 200, description: 'Members list', type: TeamMemberDto, isArray: true })
     async members() {
         const data = await this.teamService.listMembers();
-        return data.map(m => ({ id: m.id, full_name: m.full_name, role: m.role, status: m.status }));
+        return data.map(m => ({
+            id: m.id,
+            full_name: m.full_name,
+            username: m.username,
+            avatar_url: m.avatar_url,
+            role: m.role,
+            status: m.status
+        }));
     }
 
     @Get('invites')
@@ -40,6 +49,7 @@ export class TeamController {
     }
 
     @Post('invite/accept')
+    @Public()
     @ApiAcceptInvite()
     async accept(@Body(ValidationPipe) dto: AcceptInviteDto) {
         return this.teamService.accept(dto);
@@ -50,6 +60,13 @@ export class TeamController {
     @ApiRevokeInvite()
     async revoke(@Body(ValidationPipe) dto: RevokeInviteDto) {
         return this.teamService.revoke(dto.inviteId);
+    }
+
+    @Post('invite/resend')
+    @Roles(UserRole.ADMIN)
+    @ApiOperation({ summary: 'Resend invite' })
+    async resend(@Body('inviteId') inviteId: string) {
+        return this.teamService.resend(inviteId);
     }
 
     @Put('members/:id/role')

@@ -13,7 +13,7 @@ export default registerAs(
     password: String(process.env.DB_PASSWORD || ''),
     database: process.env.DB_DATABASE || 'dbtesting',
     schema: process.env.DB_SCHEMA || 'system-auth',
-    synchronize: false,
+    synchronize: true,
     logging: process.env.NODE_ENV === 'development',
     entities: [User, UserSession],
     autoLoadEntities: true,

@@ -25,7 +25,7 @@ export class TeamService {
 
     async listInvites(status?: TeamInviteStatus) {
         const qb = this.inviteRepo.createQueryBuilder('i')
-            .select(['i.id', 'i.email', 'i.role', 'i.status', 'i.expires_at', 'i.inviter_id', 'i.note', 'i.redirect_url', 'i.created_at'])
+            .select(['i.id', 'i.email', 'i.role', 'i.status', 'i.expires_at', 'i.inviter_id', 'i.note', 'i.redirect_url', 'i.created_at', 'i.token'])
             .where('i.is_deleted = false');
         if (status) qb.andWhere('i.status = :status', { status });
         return qb.orderBy('i.created_at', 'DESC').getMany();
@@ -129,5 +129,18 @@ export class TeamService {
             await this.inviteRepo.update(inv.id, { status: TeamInviteStatus.EXPIRED } as any);
         }
         return invites.length;
+    }
+    async resend(inviteId: string) {
+        const invite = await this.inviteRepo.findById(inviteId);
+        if (!invite || invite.is_deleted) throw new NotFoundException('Invite not found');
+
+        // Generate new token and extend expiry
+        const { randomBytes } = await import('crypto');
+        invite.token = randomBytes(24).toString('hex');
+        invite.expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Reset to 7 days
+        invite.status = TeamInviteStatus.PENDING; // Reset status if it was expired
+
+        await this.inviteRepo.save(invite);
+        return invite;
     }
 }

@@ -31,6 +31,9 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { MessageResponseDto } from './dto/auth-response.dto';
 import { PhotoUploadResponseDto, PhotoDeleteResponseDto } from './dto/photo-response.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { User } from '../entities/user.entity';
 import { FileUploadService } from '../common/services/file-upload.service';
 import type { UploadedFile as FileType } from '../common/services/file-upload.service';
@@ -46,6 +49,7 @@ import {
   ApiUpdateProfile,
   ApiUploadPhoto,
   ApiDeletePhoto,
+  ApiChangePassword,
 } from '../common/swagger/auth-decorators';
 
 interface RequestWithUser {
@@ -98,6 +102,26 @@ export class AuthController {
     @Body(ValidationPipe) refreshTokenDto: RefreshTokenDto,
   ): Promise<any> {
     return this.authService.refreshToken(refreshTokenDto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body(ValidationPipe) dto: ForgotPasswordDto): Promise<MessageResponseDto> {
+    const result = await this.authService.forgotPassword(dto.email);
+    return {
+      message: result.message,
+      statusCode: HttpStatus.OK,
+    };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body(ValidationPipe) dto: ResetPasswordDto): Promise<MessageResponseDto> {
+    const result = await this.authService.resetPassword(dto.token, dto.password);
+    return {
+      message: result.message,
+      statusCode: HttpStatus.OK,
+    };
   }
 
   @Post('logout')
@@ -176,6 +200,22 @@ export class AuthController {
   ): Promise<User> {
     const user: User = req.user;
     return this.authService.updateProfile(user.id, updateProfileDto);
+  }
+
+  @Put('change-password')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
+  @ApiChangePassword()
+  async changePassword(
+    @Request() req: RequestWithUser,
+    @Body(ValidationPipe) dto: ChangePasswordDto,
+  ): Promise<MessageResponseDto> {
+    const user: User = req.user;
+    await this.authService.changePassword(user.id, dto.current_password, dto.new_password);
+    return {
+      message: 'Password changed successfully',
+      statusCode: HttpStatus.OK,
+    };
   }
 
   @Post('profile/photo')
